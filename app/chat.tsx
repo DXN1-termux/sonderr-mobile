@@ -1,17 +1,94 @@
-import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from "react-native";
+import { useState, useRef, useEffect } from "react";
+import { View, Text, FlatList, StyleSheet, TouchableOpacity } from "react-native";
 import { useSettingsStore } from "@/services/storage";
-import { PROVIDERS, getProvider, ProviderId } from "@/constants/providers";
+import { PROVIDERS, getProvider } from "@/constants/providers";
+import { streamChatMessage } from "@/services/ai";
+import ChatBubble from "@/components/ChatBubble";
+import MessageInput from "@/components/MessageInput";
 import ModelSelector from "@/components/ModelSelector";
+import EmptyState from "@/components/EmptyState";
+
+export interface Message {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+}
 
 export default function ChatScreen() {
   const [modelSelectorVisible, setModelSelectorVisible] = useState(false);
-  const { activeProvider, providers, updateProvider, save } = useSettingsStore();
+  const { activeProvider, providers } = useSettingsStore();
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
 
   const active = providers.find((p) => p.id === activeProvider);
   const providerDef = getProvider(activeProvider);
   const modelLabel = active?.model || providerDef?.defaultModel || "Setup";
   const ready = active?.enabled && active?.apiKey;
+
+  useEffect(() => {
+    flatListRef.current?.scrollToEnd({ animated: true });
+  }, [messages, loading]);
+
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: text,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setLoading(true);
+
+    try {
+      let assistantText = "";
+      const assistantId = `assistant-${Date.now()}`;
+
+      const stream = streamChatMessage(text, { mode: "chat" });
+
+      for await (const chunk of stream) {
+        assistantText += chunk;
+        setMessages((prev) => {
+          const next = [...prev];
+          const idx = next.findIndex((m) => m.id === assistantId);
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], content: assistantText };
+          } else {
+            next.push({ id: assistantId, role: "assistant", content: assistantText });
+          }
+          return next;
+        });
+      }
+
+      if (!assistantText) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            content: "No response received from provider.",
+          },
+        ]);
+      }
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: err instanceof Error ? err.message : "Something went wrong.",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -36,25 +113,30 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      <View style={styles.content}>
-        {ready ? (
-          <View style={styles.readyState}>
-            <Text style={styles.readyEmoji}>⚡</Text>
-            <Text style={styles.readyTitle}>Ready</Text>
-            <Text style={styles.readySubtitle}>
-              {providerDef?.name} · {modelLabel}
-            </Text>
-            <Text style={styles.readyHint}>Chat UI and streaming will be wired up in the next pass.</Text>
-          </View>
-        ) : (
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No provider active</Text>
-            <Text style={styles.emptySubtitle}>
-              Tap Model above, pick a provider, and add your API key to start.
-            </Text>
-          </View>
-        )}
-      </View>
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.messages}
+        inverted
+        renderItem={({ item }) => <ChatBubble message={item} />}
+        ListEmptyComponent={
+          <EmptyState
+            title="Ready to build"
+            subtitle="Pick a provider and model above, then start a conversation."
+          />
+        }
+      />
+
+      <MessageInput
+        input={input}
+        onInputChange={setInput}
+        onSubmit={handleSend}
+        disabled={!ready || loading}
+        placeholder={
+          ready ? "Ask Sonderr anything..." : "Add an API key in the model picker to start"
+        }
+      />
 
       <ModelSelector visible={modelSelectorVisible} onClose={() => setModelSelectorVisible(false)} />
     </View>
@@ -117,50 +199,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-  },
-  readyState: {
-    alignItems: "center",
-    gap: 8,
-  },
-  readyEmoji: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  readyTitle: {
-    color: "#ffffff",
-    fontSize: 22,
-    fontWeight: "700",
-  },
-  readySubtitle: {
-    color: "#cccccc",
-    fontSize: 15,
-  },
-  readyHint: {
-    color: "#666666",
-    fontSize: 13,
-    marginTop: 8,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  empty: {
-    alignItems: "center",
-    gap: 10,
-  },
-  emptyTitle: {
-    color: "#ffffff",
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  emptySubtitle: {
-    color: "#888888",
-    fontSize: 14,
-    textAlign: "center",
-    lineHeight: 20,
+  messages: {
+    padding: 16,
+    paddingBottom: 8,
   },
 });

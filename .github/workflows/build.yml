@@ -28,7 +28,7 @@ jobs:
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-      - run: bun install --frozen-lockfile
+      - run: bun install
       - run: |
           bun run eas-build \
             --platform ${{ github.event.inputs.platform }} \

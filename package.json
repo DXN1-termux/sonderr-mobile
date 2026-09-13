@@ -1,19 +1,19 @@
 {
   "name": "sonderr-mobile",
-  "version": "0.1.0",
+  "version": "0.0.01",
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
     "dev": "expo start",
-    "build": "expo export -p ios -e production",
+    "export": "expo export -p ios -e production",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "build": "eas build --platform all --profile preview",
+    "eas-build": "eas build --platform all --profile preview",
     "build:android": "eas build --platform android --profile preview",
     "build:ios": "eas build --platform ios --profile preview",
     "build:local:android": "npx expo prebuild --clean && cd android && ./gradlew assembleRelease",
-    "build:local:ios": "npx expo run:ios --configuration Release",
+    "build:local:ios": "npx expo run:ios --configuration Release"
   },
   "dependencies": {
     "expo": "~52.0.0",
@@ -35,9 +35,6 @@
     "@ai-sdk/openai": "^1.0.0",
     "@ai-sdk/anthropic": "^1.0.0",
     "@ai-sdk/google": "^1.0.0",
-    "react-markdown": "^9.0.0",
-    "react-native-pdf": "^6.7.0",
-    "react-native-blob-util": "^0.19.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {

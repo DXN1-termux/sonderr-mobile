@@ -4,8 +4,8 @@ import * as DocumentPicker from "expo-document-picker";
 
 interface MessageInputProps {
   input: string;
-  onInputChange: (e: { target: { value: string } }) => void;
-  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  onInputChange: (text: string) => void;
+  onSubmit: () => void;
   disabled: boolean;
   placeholder: string;
 }
@@ -36,11 +36,10 @@ export default function MessageInput({
     }
   };
 
-  const handleFormSubmit = (e: any) => {
-    e.preventDefault();
+  const handleSend = () => {
     if (!input.trim() && attachments.length === 0) return;
     Keyboard.dismiss();
-    onSubmit(e);
+    onSubmit();
     setAttachments([]);
   };
 
@@ -70,7 +69,7 @@ export default function MessageInput({
         <TextInput
           style={styles.input}
           value={input}
-          onChangeText={(text) => onInputChange({ target: { value: text } } as any)}
+          onChangeText={onInputChange}
           placeholder={placeholder}
           placeholderTextColor="#666666"
           editable={!disabled}
@@ -79,7 +78,7 @@ export default function MessageInput({
         />
 
         <TouchableOpacity
-          onPress={handleFormSubmit as any}
+          onPress={handleSend}
           style={[styles.sendButton, disabled && styles.sendButtonDisabled]}
           disabled={disabled || (!input.trim() && attachments.length === 0)}
         >
